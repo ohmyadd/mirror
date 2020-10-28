@@ -1,0 +1,76 @@
+version: '3.3'
+
+services:
+        ss:
+                image: shadowsocks
+                build:
+                        context: ./
+                restart: always
+                ports: ["80:80", "1080:1080"]
+                cap_add: ["NET_ADMIN"]
+                volumes: ["./ss.json:/ss.json"]
+                networks: ["mirror"]
+                command: >
+                        sh -c "
+                          iptables -t nat -A OUTPUT -d $$(grep 'server\"' /ss.json  | awk -F '\"' '{print $$4}') -j RETURN ;
+                          iptables -t nat -A OUTPUT -d 10.0.0.0/8 -j RETURN ;
+                          iptables -t nat -A OUTPUT -d 127.0.0.0/8 -j RETURN ;
+                          iptables -t nat -A OUTPUT -d 172.16.0.0/12 -j RETURN ;
+                          iptables -t nat -A OUTPUT -d 192.168.0.0/16 -j RETURN ;
+                          iptables -t nat -A OUTPUT -p tcp -j REDIRECT --to-port 12345 ;
+                          echo 'nameserver 127.0.0.1' > /etc/resolv.conf ;
+                          screen -dmS ss1 sh -c 'ss-local -v -c /ss.json -l 1080 '; 
+                          screen -dmS ss2 sh -c 'ss-tunnel -v -c /ss.json -l 53 -L 8.8.8.8:53';
+                                                 ss-redir -vv -c /ss.json -l 12345; "
+        ng:
+                image: nginx
+                restart: always
+                network_mode: "service:ss"
+                volumes: ["./nginx.conf:/etc/nginx/nginx.conf"]
+
+        mr1:
+                image: registry:2.7
+                restart: always
+                environment:
+                        REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+                        REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+                network_mode: "service:ss"
+                volumes:
+                        - /var/lib/registry/docker:/var/lib/registry
+
+        mr2:
+                image: registry:2.7
+                restart: always
+                environment:
+                        REGISTRY_HTTP_ADDR: 0.0.0.0:5001
+                        REGISTRY_PROXY_REMOTEURL: https://k8s.gcr.io
+                network_mode: "service:ss"
+                volumes:
+                        - /var/lib/registry/k8sgcr:/var/lib/registry
+        mr3:
+                image: registry:2.7
+                restart: always
+                environment:
+                        REGISTRY_HTTP_ADDR: 0.0.0.0:5002
+                        REGISTRY_PROXY_REMOTEURL: https://quay.io
+                network_mode: "service:ss"
+                volumes:
+                        - /var/lib/registry/quay:/var/lib/registry
+        mr4:
+                image: registry:2.7
+                restart: always
+                environment:
+                        REGISTRY_HTTP_ADDR: 0.0.0.0:5003
+                        REGISTRY_PROXY_REMOTEURL: https://gcr.io
+                network_mode: "service:ss"
+                volumes:
+                        - /var/lib/registry/gcrio:/var/lib/registry
+networks:
+  mirror:
+    ipam:
+      config:
+        - subnet: "172.124.0.0/24"
+          gateway: "172.124.0.1"
+    driver_opts:
+      com.docker.network.bridge.name: br-mirror
+      com.docker.network.driver.mtu: 1350
