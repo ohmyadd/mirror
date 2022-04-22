@@ -1,0 +1,43 @@
+version: '3.3'
+
+services:
+        ss:
+                image: shadowsocks
+                build:
+                        context: ./
+                restart: always
+                cap_add: ["NET_ADMIN"]
+                volumes: ["./ss.json:/ss.json"]
+                networks: ["mirror"]
+                command: >
+                        sh -c "
+                          iptables -t nat -A PREROUTING -d 0.0.0.0/8 -j RETURN;
+                          iptables -t nat -A PREROUTING -d 10.0.0.0/8 -j RETURN;
+                          iptables -t nat -A PREROUTING -d 127.0.0.0/8 -j RETURN;
+                          iptables -t nat -A PREROUTING -d 169.254.0.0/16 -j RETURN;
+                          iptables -t nat -A PREROUTING -d 172.16.0.0/12 -j RETURN;
+                          iptables -t nat -A PREROUTING -d 198.18.0.0/16 -j RETURN;
+                          iptables -t nat -A PREROUTING -d 192.168.0.0/16 -j RETURN;
+                          iptables -t nat -A PREROUTING -d 224.0.0.0/4 -j RETURN;
+                          iptables -t nat -A PREROUTING -d 240.0.0.0/4 -j RETURN;
+                          iptables -t nat -A PREROUTING  -p tcp -j REDIRECT --to-port 12345;
+
+                          ip rule add fwmark 1 lookup 100;
+                          ip route add local default dev lo table 100;
+                          iptables -t mangle -A PREROUTING -d 0.0.0.0/8 -j RETURN  ;
+                          iptables -t mangle -A PREROUTING -d 10.0.0.0/8 -j RETURN ;
+                          iptables -t mangle -A PREROUTING -d 127.0.0.0/8 -j RETURN ;
+                          iptables -t mangle -A PREROUTING -d 169.254.0.0/16 -j RETURN ;
+                          iptables -t mangle -A PREROUTING -d 172.16.0.0/12 -j RETURN ;
+                          iptables -t mangle -A PREROUTING -d 198.18.0.0/16 -j RETURN ;
+                          iptables -t mangle -A PREROUTING -d 192.168.0.0/16 -j RETURN ;
+                          iptables -t mangle -A PREROUTING -d 224.0.0.0/4 -j RETURN ;
+                          iptables -t mangle -A PREROUTING -d 240.0.0.0/4 -j RETURN ;
+                          iptables -t mangle -A PREROUTING -d 240.0.0.0/4 -j RETURN ;
+                          iptables -t mangle -A PREROUTING -p udp  -j TPROXY --on-port 12345 --tproxy-mark 0x01/0x01;
+
+                          ss-redir -vv -c /ss.json -l 12345; "
+networks:
+  mirror:
+    external:
+        name: kind

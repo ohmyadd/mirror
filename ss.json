@@ -1,9 +1,9 @@
 {
-    "server":"1.1.1.1",
+    "server":"42.157.196.219",
     "server_port":28042,
     "local_address": "0.0.0.0",
     "local_port":9999,
-    "password":"hhhh",
+    "password":"S3iWIR",
     "timeout":300,
     "method":"rc4-md5",
     "fast_open": false,
